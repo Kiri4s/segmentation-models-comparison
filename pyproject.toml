@@ -1,0 +1,19 @@
+[project]
+name = "segmentation-models-comparison"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fiftyone>=1.10.0",
+    "pycocotools>=2.0.10",
+    "torch>=2.0.0",
+    "lightning>=2.0.0",
+    "opencv-python>=4.0.0",
+    "hydra-core>=1.0.0",
+    "segmentation-models-pytorch>=0.3.3",
+    "tensorboard==2.15.2",
+    "tensorboardx>=2.6.4",
+    "ipykernel>=7.1.0",
+    "fire>=0.7.1",
+]
