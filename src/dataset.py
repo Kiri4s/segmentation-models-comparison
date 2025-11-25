@@ -1,4 +1,5 @@
 import os
+import torch
 from typing import Callable, Optional
 
 import numpy as np
@@ -56,11 +57,6 @@ class DeepGlobeDataset(Dataset):
             if transform is None
             else transform
         )
-        self.target_transform = (
-            transforms.Compose([transforms.ToTensor()])
-            if transform is None
-            else transform
-        )
 
     def __len__(self) -> int:
         """Returns the total number of samples in the dataset."""
@@ -78,12 +74,13 @@ class DeepGlobeDataset(Dataset):
         mask_path = os.path.join(self.data_dir, self.masks[idx])
 
         image = Image.open(img_path).convert("RGB")
-        mask = Image.open(mask_path)
+        mask = Image.open(mask_path).convert("RGB")
 
         if self.transform:
             image = self.transform(image)
 
         mask_array = np.array(mask)
+
         # Assuming the mask is an RGB image, we convert RGB values to class labels.
         # This mapping might need adjustment based on the actual dataset's color-to-class encoding.
         class_mask = np.zeros(mask_array.shape[:2], dtype=np.uint8)
@@ -92,13 +89,38 @@ class DeepGlobeDataset(Dataset):
             (255, 255, 0): 1,  # Agriculture land
             (255, 0, 255): 2,  # Rangeland
             (0, 255, 0): 3,  # Forest land
-            (255, 0, 0): 4,  # Water
+            (0, 0, 255): 4,  # Water
             (255, 255, 255): 5,  # Barren land
             (0, 0, 0): 6,  # Unknown
         }
+
         for rgb, label in class_mapping.items():
             class_mask[(mask_array == rgb).all(axis=-1)] = label
-        class_mask = Image.fromarray(class_mask)
-        if self.target_transform:
-            class_mask = self.target_transform(class_mask).squeeze(0).long()
+        class_mask = torch.from_numpy(class_mask).long()
         return image, class_mask
+
+
+CLASS_MAPPING = {
+    (0, 255, 255): 0,  # Urban land
+    (255, 255, 0): 1,  # Agriculture land
+    (255, 0, 255): 2,  # Rangeland
+    (0, 255, 0): 3,  # Forest land
+    (0, 0, 255): 4,  # Water
+    (255, 255, 255): 5,  # Barren land
+    (0, 0, 0): 6,  # Unknown
+}
+
+
+def label_to_rgb_mask(label_mask: np.ndarray) -> Image.Image:
+    """
+    Converts a 2D label mask to a 3D RGB mask.
+    Args:
+        label_mask (np.ndarray): A 2D numpy array where each pixel is a class label.
+    Returns:
+        PIL.Image.Image: An RGB image representing the mask.
+    """
+    rgb_mask = np.zeros(label_mask.shape + (3,), dtype=np.uint8)
+    reverse_mapping = {label: rgb for rgb, label in CLASS_MAPPING.items()}
+    for label, rgb in reverse_mapping.items():
+        rgb_mask[label_mask == label] = rgb
+    return Image.fromarray(rgb_mask)

@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 from typing import Dict, List
+import json
 
 
 def plot_loss(
@@ -13,8 +14,8 @@ def plot_loss(
         save_path (str): The path to save the plot image.
     """
     plt.figure(figsize=(10, 6))
-    plt.plot(history["train_loss"], label="Train Loss")
-    plt.plot(history["val_loss"], label="Validation Loss")
+    plt.plot(history["tl"], label="Train Loss")
+    plt.plot(history["vl"], label="Validation Loss")
     plt.title("Loss over Epochs")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
@@ -33,11 +34,18 @@ def plot_iou(history: Dict[str, List[float]], save_path: str = "iou_plot.png") -
         save_path (str): The path to save the plot image.
     """
     plt.figure(figsize=(10, 6))
-    plt.plot(history["val_accuracy"], label="Validation IoU")
+    plt.plot(history["val_meanIoU"], label="Validation IoU")
     plt.title("Validation IoU over Epochs")
     plt.xlabel("Epoch")
-    plt.ylabel("IoU (%)")
+    plt.ylabel("IoU Score")
     plt.legend()
     plt.grid(True)
     plt.savefig(save_path)
     plt.close()
+
+
+if __name__ == "__main__":
+    with open("./checkpoints/pspnet_training_history.json", "r") as f:
+        history = json.load(f)
+    plot_loss(history, save_path="../results/pspnet_loss_plot.png")
+    plot_iou(history, save_path="../results/pspnet_iou_plot.png")

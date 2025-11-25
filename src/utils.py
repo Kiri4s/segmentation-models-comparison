@@ -52,9 +52,9 @@ def train_and_validate(
 
                 predicted = (torch.argmax(outputs, dim=1)).long()
 
-                #val_bar.set_postfix(
+                # val_bar.set_postfix(
                 #    val_loss=val_loss / len(val_loader)
-                #)
+                # )
 
                 val_loss /= len(val_loader)
                 iou = IoU(predicted, masks)
