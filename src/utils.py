@@ -18,7 +18,7 @@ def train_and_validate(
     model_name: str,
     checkpoint_dir: str = "./checkpoints",
 ) -> Tuple[torch.nn.Module, Dict[str, list]]:
-    history = {"train_loss": [], "val_loss": [], "val_meanIoU": []}
+    history = {"train_loss": [], "val_loss": [], "val_meanIoU": [], "tl": [], "vl": []}
     best_val_loss = float("inf")
     IoU = MeanIoU(num_classes=7, input_format="index").to(device)
     for epoch in range(epochs):
@@ -37,12 +37,11 @@ def train_and_validate(
             running_loss += loss.item()
             train_bar.set_postfix(loss=running_loss / len(train_loader))
 
-        history["train_loss"].append(running_loss / len(train_loader))
+            history["train_loss"].append(running_loss / len(train_loader))
+            history["tl"].append(loss.item())
 
         model.eval()
         val_loss = 0.0
-        correct = 0
-        total = 0
         val_bar = tqdm(val_loader, desc=f"Epoch {epoch + 1}/{epochs} [Val]")
         with torch.no_grad():
             for images, masks in val_bar:
@@ -51,19 +50,18 @@ def train_and_validate(
                 loss = criterion(outputs, masks)
                 val_loss += loss.item()
 
-                predicted = (torch.sigmoid(outputs) > 0.5).long()
-                total += masks.nelement()
-                correct += (predicted == masks).sum().item()
+                predicted = (torch.argmax(outputs, dim=1)).long()
 
-                val_bar.set_postfix(
-                    val_loss=val_loss / len(val_loader),
-                    accuracy=100 * correct / total,
-                )
+                #val_bar.set_postfix(
+                #    val_loss=val_loss / len(val_loader)
+                #)
 
-        val_loss /= len(val_loader)
-        iou = IoU(predicted, masks)
+                val_loss /= len(val_loader)
+                iou = IoU(predicted, masks)
+                history["vl"].append(loss.item())
+                history["val_meanIoU"].append(iou.item())
+
         history["val_loss"].append(val_loss)
-        history["val_meanIoU"].append(iou.item())
 
         print(
             f"Epoch {epoch + 1}/{epochs}, Train Loss: {history['train_loss'][-1]:.4f}, "

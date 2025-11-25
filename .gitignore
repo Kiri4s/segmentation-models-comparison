@@ -13,3 +13,4 @@ tasks
 
 src/lightning_logs
 src/outputs
+src/checkpoints/*.pth

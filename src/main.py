@@ -5,44 +5,20 @@ from utils import train_and_validate
 from typing import TypedDict
 import segmentation_models_pytorch as smp
 from visualization import plot_loss, plot_iou
+from torchvision import transforms as T
 
 
-class UnetConfig(TypedDict):
+class StandartConfig(TypedDict):
     data_train: str = "../dataset/train"
     data_val: str = "../dataset/valid"
+    val_size: float = 0.2
+    transform = None
     batch_size: int = 1
     learning_rate: float = 1e-3
     epochs: int = 1
     encoder_name: str = "resnet34"
     encoder_weights: str = "imagenet"
-    in_channels: int = 3
-    classes: int = 7
-    device: str = "mps"
-    checkpoints_dir: str = "./checkpoints"
-
-
-class PSPnetConfig(TypedDict):
-    data_train: str = "../dataset/train"
-    data_val: str = "../dataset/valid"
-    batch_size: int = 1
-    learning_rate: float = 1e-3
-    epochs: int = 1
-    encoder_name: str = "resnet34"
-    encoder_weights: str = "imagenet"
-    in_channels: int = 3
-    classes: int = 7
-    device: str = "mps"
-    checkpoints_dir: str = "./checkpoints"
-
-
-class DLabConfig(TypedDict):
-    data_train: str = "../dataset/train"
-    data_val: str = "../dataset/valid"
-    batch_size: int = 1
-    learning_rate: float = 1e-3
-    epochs: int = 1
-    encoder_name: str = "resnet34"
-    encoder_weights: str = "imagenet"
+    activation: str = "logsoftmax"
     in_channels: int = 3
     classes: int = 7
     device: str = "mps"
@@ -50,42 +26,53 @@ class DLabConfig(TypedDict):
 
 
 def main(model_name: str = "unet", cfg=None):
-    if model_name == "unet":
-        if cfg is not None:
-            cfg = cfg
-        else:
-            cfg = UnetConfig
+    if cfg is None:
+        cfg = StandartConfig
 
+    if model_name == "unet":
         model = smp.Unet(
             encoder_name=cfg.encoder_name,
             encoder_weights=cfg.encoder_weights,
             in_channels=cfg.in_channels,
             classes=cfg.classes,
+            activation=cfg.activation,
         )
-
     elif model_name == "pspnet":
-        if cfg is not None:
-            cfg = cfg
-        else:
-            cfg = PSPnetConfig
-
         model = smp.PSPNet(
             encoder_name=cfg.encoder_name,
             encoder_weights=cfg.encoder_weights,
             in_channels=cfg.in_channels,
             classes=cfg.classes,
+            activation=cfg.activation,
         )
 
     elif model_name == "deeplab":
-        if cfg is not None:
-            cfg = cfg
-        else:
-            cfg = DLabConfig
         model = smp.DeepLabV3(
             encoder_name=cfg.encoder_name,
             encoder_weights=cfg.encoder_weights,
             in_channels=cfg.in_channels,
             classes=cfg.classes,
+            activation=cfg.activation,
+        )
+
+    elif model_name == "fpn":
+        cfg.transform = T.Compose([T.Resize((2464, 2464)), T.ToTensor()])
+        model = smp.FPN(
+            encoder_name=cfg.encoder_name,
+            encoder_weights=cfg.encoder_weights,
+            in_channels=cfg.in_channels,
+            classes=cfg.classes,
+            activation=cfg.activation,
+        )
+
+    elif model_name == "unet++":
+        cfg.transform = T.Compose([T.Resize((2464, 2464)), T.ToTensor()])
+        model = smp.UnetPlusPlus(
+            encoder_name=cfg.encoder_name,
+            encoder_weights=cfg.encoder_weights,
+            in_channels=cfg.in_channels,
+            classes=cfg.classes,
+            activation=cfg.activation,
         )
 
     else:
@@ -94,8 +81,18 @@ def main(model_name: str = "unet", cfg=None):
         )
 
     model.to(cfg.device)
-    train_dataset = DeepGlobeDataset(data_dir=cfg.data_train)
-    val_dataset = DeepGlobeDataset(data_dir=cfg.data_val)
+    train_dataset = DeepGlobeDataset(
+        data_dir=cfg.data_train,
+        split="train",
+        val_size=cfg.val_size,
+        transform=cfg.transform,
+    )
+    val_dataset = DeepGlobeDataset(
+        data_dir=cfg.data_train,
+        split="val",
+        val_size=cfg.val_size,
+        transform=cfg.transform,
+    )
 
     model, history = train_and_validate(
         model=model,

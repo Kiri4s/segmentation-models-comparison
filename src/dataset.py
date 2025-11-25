@@ -5,6 +5,7 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
+from sklearn.model_selection import train_test_split
 
 
 class DeepGlobeDataset(Dataset):
@@ -17,6 +18,9 @@ class DeepGlobeDataset(Dataset):
     def __init__(
         self,
         data_dir: str,
+        split: str = "train",
+        val_size: float = 0.2,
+        seed: int = 42,
         transform: Optional[Callable] = None,
     ):
         """
@@ -25,20 +29,38 @@ class DeepGlobeDataset(Dataset):
             data_dir (str): Directory path containing the images and masks.
             transform (Optional[Callable]): A transform to apply to the images.
         """
+        images = sorted([f for f in os.listdir(data_dir) if f.endswith("_sat.jpg")])
+        masks = sorted([f for f in os.listdir(data_dir) if f.endswith("_mask.png")])
+        train_images, val_images, train_masks, val_masks = train_test_split(
+            images,
+            masks,
+            test_size=val_size,
+            random_state=seed,
+        )
         self.data_dir = data_dir
-        self.images = sorted(
-            [f for f in os.listdir(data_dir) if f.endswith("_sat.jpg")]
-        )
-        self.masks = sorted(
-            [f for f in os.listdir(data_dir) if f.endswith("_mask.png")]
-        )
+
+        if split == "full":
+            self.images = images
+            self.masks = masks
+        elif split == "train":
+            self.images = train_images
+            self.masks = train_masks
+        elif split == "val":
+            self.images = val_images
+            self.masks = val_masks
+        else:
+            raise ValueError("unsupported split")
 
         self.transform = (
             transforms.Compose([transforms.ToTensor()])
             if transform is None
             else transform
         )
-        self.target_transform = transforms.Compose([transforms.ToTensor()])
+        self.target_transform = (
+            transforms.Compose([transforms.ToTensor()])
+            if transform is None
+            else transform
+        )
 
     def __len__(self) -> int:
         """Returns the total number of samples in the dataset."""
@@ -76,7 +98,7 @@ class DeepGlobeDataset(Dataset):
         }
         for rgb, label in class_mapping.items():
             class_mask[(mask_array == rgb).all(axis=-1)] = label
-
+        class_mask = Image.fromarray(class_mask)
         if self.target_transform:
-            class_mask = self.target_transform(class_mask).squeeze(0)
+            class_mask = self.target_transform(class_mask).squeeze(0).long()
         return image, class_mask
