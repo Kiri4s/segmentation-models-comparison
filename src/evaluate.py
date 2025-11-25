@@ -1,23 +1,20 @@
 import torch
 import fire
 from dataset import DeepGlobeDataset
-from diceloss import DiceLoss
-from utils import train_and_validate
 from typing import TypedDict
 import segmentation_models_pytorch as smp
-from visualization import plot_loss, plot_iou
 from torchvision import transforms as T
+from torchmetrics.classification import MulticlassConfusionMatrix
+import os
+import pandas as pd
 from tqdm import tqdm
 
 
 class StandartConfig(TypedDict):
-    data_train: str = "../dataset/train"
-    data_val: str = "../dataset/valid"
+    data_test: str = "../dataset/train"
     val_size: float = 0.2
     transform = None
     batch_size: int = 1
-    learning_rate: float = 1e-5
-    epochs: int = 1
     encoder_name: str = "resnet34"
     encoder_weights: str = "imagenet"
     activation: str = "logsoftmax"
@@ -27,25 +24,7 @@ class StandartConfig(TypedDict):
     checkpoints_dir: str = "./checkpoints"
 
 
-def calculate_weights(data: torch.utils.data.DataLoader) -> torch.Tensor:
-    class_counts = torch.zeros(7, dtype=torch.long)
-    for _, mask in tqdm(data):
-        for i in range(7):
-            class_counts[i] += torch.sum(mask == i).item()
-
-    print(class_counts)
-    weights = 1.0 / (class_counts + 1e-3)
-
-    weights = weights / weights.mean()
-    print(weights)
-
-    return weights
-
-
-def main(model_name: str = "unet", cfg=None):
-    if cfg is None:
-        cfg = StandartConfig
-
+def get_model(model_name: str, cfg):
     if model_name == "unet":
         model = smp.Unet(
             encoder_name=cfg.encoder_name,
@@ -96,47 +75,78 @@ def main(model_name: str = "unet", cfg=None):
         raise ValueError(
             f"Model {model_name} is not supported. Choose from 'unet', 'pspnet', 'deeplab'."
         )
+    return model
 
-    model.to(cfg.device)
-    train_dataset = DeepGlobeDataset(
-        data_dir=cfg.data_train,
-        split="train",
-        val_size=cfg.val_size,
-        transform=cfg.transform,
-    )
-    val_dataset = DeepGlobeDataset(
-        data_dir=cfg.data_train,
+
+def evaluate(model_list=["pspnet"], cfg=None):
+    if cfg is None:
+        cfg = StandartConfig
+
+    test_dataset = DeepGlobeDataset(
+        data_dir=cfg.data_test,
         split="val",
         val_size=cfg.val_size,
-        transform=cfg.transform,
-    )
-    weights = torch.tensor([0.0401, 0.0074, 0.0513, 0.0357, 0.1287, 0.0499, 6.6869]).to(
-        cfg.device
     )
 
-    model, history = train_and_validate(
-        model=model,
-        train_loader=torch.utils.data.DataLoader(
-            train_dataset, batch_size=cfg.batch_size, shuffle=True
-        ),
-        val_loader=torch.utils.data.DataLoader(
-            val_dataset, batch_size=cfg.batch_size, shuffle=False
-        ),
-        optimizer=torch.optim.Adam(model.parameters(), lr=cfg.learning_rate),
-        criterion=torch.nn.CrossEntropyLoss(weight=weights),
-        epochs=cfg.epochs,
-        device=cfg.device,
-        model_name=model_name,
-        checkpoint_dir=cfg.checkpoints_dir,
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset, batch_size=cfg.batch_size, shuffle=False
     )
-    try:
-        plot_loss(history, save_path=f"../results/{model_name}_loss_plot.png")
-        plot_iou(history, save_path=f"../results/{model_name}_iou_plot.png")
-    except Exception as e:
-        print(e)
 
-    return model, history
+    criterion = torch.nn.CrossEntropyLoss()
+    conf_matrix = MulticlassConfusionMatrix(num_classes=cfg.classes).to(cfg.device)
+
+    results = []
+
+    for model_file in os.listdir(cfg.checkpoints_dir):
+        if not model_file.endswith(".pth"):
+            continue
+
+        model_name = model_file.split("_best.pth")[0]
+        if model_name not in model_list:
+            continue
+        model_path = os.path.join(cfg.checkpoints_dir, model_file)
+
+        model = get_model(model_name, cfg)
+        model.load_state_dict(
+            torch.load(model_path, map_location=torch.device(cfg.device))
+        )
+        model.to(cfg.device)
+        model.eval()
+
+        total_loss = 0
+        total_iou = 0
+        print(f"Evaluating model: {model_name}")
+        with torch.no_grad():
+            for images, masks in tqdm(test_loader):
+                images, masks = images.to(cfg.device), masks.to(cfg.device)
+                outputs = model(images)
+                loss = criterion(outputs, masks)
+                total_loss += loss.item()
+
+                predicted = torch.argmax(outputs, dim=1)
+                conf_matrix.update(predicted, masks)
+
+        avg_loss = total_loss / len(test_loader)
+
+        cm = conf_matrix.compute()
+        iou = cm.diag() / (cm.sum(dim=1) + cm.sum(dim=0) - cm.diag())
+        mean_iou = iou.nanmean()
+
+        results.append(
+            {"model": model_name, "loss": avg_loss, "mean_iou": mean_iou.item()}
+        )
+
+        print(f"Model: {model_name}")
+        print(f"  Loss: {avg_loss:.4f}")
+        print(f"  Mean IoU: {mean_iou:.4f}")
+        print(f"  Confusion Matrix:\n{cm.cpu().numpy()}")
+
+        conf_matrix.reset()
+
+    results_df = pd.DataFrame(results)
+    print("\n--- Comparison ---")
+    print(results_df)
 
 
 if __name__ == "__main__":
-    fire.Fire(main)
+    fire.Fire(evaluate)
