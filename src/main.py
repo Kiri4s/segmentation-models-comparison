@@ -6,6 +6,7 @@ from diceloss import DiceLoss
 from utils import train_and_validate, get_model
 from typing import TypedDict
 from visualization import plot_loss, plot_iou
+import segmentation_models_pytorch as smp
 
 
 class StandartConfig(TypedDict):
@@ -13,6 +14,7 @@ class StandartConfig(TypedDict):
     data_val: str = "../dataset/valid"
     val_size: float = 0.2
     transform = None
+    target_transform = None
     batch_size: int = 1
     learning_rate: float = 1e-4
     epochs: int = 1
@@ -43,18 +45,22 @@ def main(model_name: str = "unet", cfg=None):
         split="train",
         val_size=cfg.val_size,
         transform=cfg.transform,
+        target_transform=cfg.target_transform,
     )
     val_dataset = DeepGlobeDataset(
         data_dir=cfg.data_train,
         split="val",
         val_size=cfg.val_size,
         transform=cfg.transform,
+        target_transform=cfg.target_transform,
     )
+
     weights = torch.tensor([0.0401, 0.0074, 0.0513, 0.0357, 0.1287, 0.0499, 6.6869]).to(
         cfg.device
     )
+    loss_fn = smp.losses.DiceLoss(smp.losses.MULTICLASS_MODE, from_logits=True)
 
-    # sanity check
+    print("Sanity Check")
     train_and_validate(
         model=model,
         train_loader=torch.utils.data.DataLoader(
@@ -68,7 +74,7 @@ def main(model_name: str = "unet", cfg=None):
             shuffle=False,
         ),
         optimizer=torch.optim.Adam(model.parameters(), lr=cfg.learning_rate),
-        criterion=DiceLoss(),
+        criterion=loss_fn,
         epochs=cfg.epochs,
         device=cfg.device,
         model_name=model_name,
@@ -85,7 +91,7 @@ def main(model_name: str = "unet", cfg=None):
             val_dataset, batch_size=cfg.batch_size, shuffle=False
         ),
         optimizer=torch.optim.Adam(model.parameters(), lr=cfg.learning_rate),
-        criterion=DiceLoss(),
+        criterion=loss_fn,
         epochs=cfg.epochs,
         device=cfg.device,
         model_name=model_name,
