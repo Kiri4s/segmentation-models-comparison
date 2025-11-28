@@ -37,6 +37,7 @@ def get_model(model_name: str, cfg):
 
     elif model_name == "fpn":
         cfg.transform = T.Compose([T.Resize((2464, 2464)), T.ToTensor()])
+        cfg.target_transform = T.Compose([T.Resize((2464, 2464))])
         model = smp.FPN(
             encoder_name=cfg.encoder_name,
             encoder_weights=cfg.encoder_weights,
@@ -47,6 +48,7 @@ def get_model(model_name: str, cfg):
 
     elif model_name == "unet++":
         cfg.transform = T.Compose([T.Resize((2464, 2464)), T.ToTensor()])
+        cfg.target_transform = T.Compose([T.Resize((2464, 2464))])
         model = smp.UnetPlusPlus(
             encoder_name=cfg.encoder_name,
             encoder_weights=cfg.encoder_weights,
