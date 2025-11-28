@@ -1,81 +1,13 @@
 import torch
 import fire
 from dataset import DeepGlobeDataset
-from typing import TypedDict
-import segmentation_models_pytorch as smp
-from torchvision import transforms as T
 from torchmetrics.classification import MulticlassConfusionMatrix
 import os
 import pandas as pd
 from tqdm import tqdm
-
-
-class StandartConfig(TypedDict):
-    data_test: str = "../dataset/train"
-    val_size: float = 0.2
-    transform = None
-    batch_size: int = 1
-    encoder_name: str = "resnet34"
-    encoder_weights: str = "imagenet"
-    activation: str = "logsoftmax"
-    in_channels: int = 3
-    classes: int = 7
-    device: str = "mps"
-    checkpoints_dir: str = "./checkpoints"
-
-
-def get_model(model_name: str, cfg):
-    if model_name == "unet":
-        model = smp.Unet(
-            encoder_name=cfg.encoder_name,
-            encoder_weights=cfg.encoder_weights,
-            in_channels=cfg.in_channels,
-            classes=cfg.classes,
-            activation=cfg.activation,
-        )
-    elif model_name == "pspnet":
-        model = smp.PSPNet(
-            encoder_name=cfg.encoder_name,
-            encoder_weights=cfg.encoder_weights,
-            in_channels=cfg.in_channels,
-            classes=cfg.classes,
-            activation=cfg.activation,
-        )
-
-    elif model_name == "deeplab":
-        model = smp.DeepLabV3(
-            encoder_name=cfg.encoder_name,
-            encoder_weights=cfg.encoder_weights,
-            in_channels=cfg.in_channels,
-            classes=cfg.classes,
-            activation=cfg.activation,
-        )
-
-    elif model_name == "fpn":
-        cfg.transform = T.Compose([T.Resize((2464, 2464)), T.ToTensor()])
-        model = smp.FPN(
-            encoder_name=cfg.encoder_name,
-            encoder_weights=cfg.encoder_weights,
-            in_channels=cfg.in_channels,
-            classes=cfg.classes,
-            activation=cfg.activation,
-        )
-
-    elif model_name == "unet++":
-        cfg.transform = T.Compose([T.Resize((2464, 2464)), T.ToTensor()])
-        model = smp.UnetPlusPlus(
-            encoder_name=cfg.encoder_name,
-            encoder_weights=cfg.encoder_weights,
-            in_channels=cfg.in_channels,
-            classes=cfg.classes,
-            activation=cfg.activation,
-        )
-
-    else:
-        raise ValueError(
-            f"Model {model_name} is not supported. Choose from 'unet', 'pspnet', 'deeplab'."
-        )
-    return model
+from diceloss import DiceLoss
+from main import StandartConfig
+from utils import get_model
 
 
 def evaluate(model_list=["pspnet"], cfg=None):
@@ -83,7 +15,7 @@ def evaluate(model_list=["pspnet"], cfg=None):
         cfg = StandartConfig
 
     test_dataset = DeepGlobeDataset(
-        data_dir=cfg.data_test,
+        data_dir=cfg.data_train,
         split="val",
         val_size=cfg.val_size,
     )
@@ -92,7 +24,7 @@ def evaluate(model_list=["pspnet"], cfg=None):
         test_dataset, batch_size=cfg.batch_size, shuffle=False
     )
 
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = DiceLoss()  # torch.nn.CrossEntropyLoss()
     conf_matrix = MulticlassConfusionMatrix(num_classes=cfg.classes).to(cfg.device)
 
     results = []
@@ -114,7 +46,6 @@ def evaluate(model_list=["pspnet"], cfg=None):
         model.eval()
 
         total_loss = 0
-        total_iou = 0
         print(f"Evaluating model: {model_name}")
         with torch.no_grad():
             for images, masks in tqdm(test_loader):
