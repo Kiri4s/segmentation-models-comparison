@@ -30,6 +30,7 @@ class DeepGlobeDataset(Dataset):
         self,
         data_dir: str,
         split: str = "train",
+        test_size: float = 0.1,
         val_size: float = 0.2,
         seed: int = 42,
         transform: Optional[Callable] = None,
@@ -43,9 +44,15 @@ class DeepGlobeDataset(Dataset):
         """
         images = sorted([f for f in os.listdir(data_dir) if f.endswith("_sat.jpg")])
         masks = sorted([f for f in os.listdir(data_dir) if f.endswith("_mask.png")])
-        train_images, val_images, train_masks, val_masks = train_test_split(
+        train_images, test_images, train_masks, test_masks = train_test_split(
             images,
             masks,
+            test_size=test_size,
+            random_state=seed,
+        )
+        train_images, val_images, train_masks, val_masks = train_test_split(
+            train_images,
+            train_masks,
             test_size=val_size,
             random_state=seed,
         )
@@ -60,6 +67,9 @@ class DeepGlobeDataset(Dataset):
         elif split == "val":
             self.images = val_images
             self.masks = val_masks
+        elif split == "test":
+            self.images = test_images
+            self.masks = test_masks
         else:
             raise ValueError("unsupported split")
 

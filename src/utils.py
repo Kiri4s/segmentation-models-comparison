@@ -59,7 +59,7 @@ def get_model(model_name: str, cfg):
 
     else:
         raise ValueError(
-            f"Model {model_name} is not supported. Choose from 'unet', 'pspnet', 'deeplab'."
+            f"Model {model_name} is not supported. Choose from 'unet', 'pspnet', 'fpn'."
         )
     return model
 
@@ -77,6 +77,8 @@ def train_and_validate(
     sanity_check=False,
 ) -> Tuple[torch.nn.Module, Dict[str, list]]:
     history = {
+        "model_name": model_name,
+        "metadata": f"""{model_name}_Epochs:{epochs}_lf:{criterion.__class__.__name__}_lr:{optimizer.param_groups[0]["lr"]}""",
         "train_loss": [],
         "val_loss": [],
         "val_meanIoU": [],
@@ -141,9 +143,9 @@ def train_and_validate(
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            save_model(model, f"{checkpoint_dir}/{model_name}_best.pth")
+            save_model(model, f"{checkpoint_dir}/{history['metadata']}_best.pth")
 
-        save_history(history, f"{checkpoint_dir}/{model_name}_training_history.json")
+        save_history(history, f"{checkpoint_dir}/{history['metadata']}_trainhist.json")
 
     return model, history
 
