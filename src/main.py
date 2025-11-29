@@ -5,18 +5,18 @@ from torch.utils.data import Subset
 from diceloss import DiceLoss
 from utils import train_and_validate, get_model
 from typing import TypedDict
-from visualization import plot_loss, plot_iou
+from visualization import after_training_plots
 import segmentation_models_pytorch as smp
 
 
 class StandartConfig(TypedDict):
-    data_train: str = "../dataset/train"
-    data_val: str = "../dataset/valid"
+    data_dir: str = "../dataset/train"
     val_size: float = 0.2
+    test_size: float = 0.1
     transform = None
     target_transform = None
     batch_size: int = 1
-    learning_rate: float = 1e-4
+    learning_rate: float = 2e-4
     epochs: int = 1
     encoder_name: str = "resnet18"
     encoder_weights: str = "imagenet"
@@ -41,14 +41,14 @@ def main(model_name: str = "unet", cfg=None):
                 param.requires_grad = False
 
     train_dataset = DeepGlobeDataset(
-        data_dir=cfg.data_train,
+        data_dir=cfg.data_dir,
         split="train",
         val_size=cfg.val_size,
         transform=cfg.transform,
         target_transform=cfg.target_transform,
     )
     val_dataset = DeepGlobeDataset(
-        data_dir=cfg.data_train,
+        data_dir=cfg.data_dir,
         split="val",
         val_size=cfg.val_size,
         transform=cfg.transform,
@@ -97,11 +97,8 @@ def main(model_name: str = "unet", cfg=None):
         model_name=model_name,
         checkpoint_dir=cfg.checkpoints_dir,
     )
-    try:
-        plot_loss(history, save_path=f"../results/{model_name}_loss_plot.png")
-        plot_iou(history, save_path=f"../results/{model_name}_iou_plot.png")
-    except Exception as e:
-        print(e)
+    
+    after_training_plots(history, save_path="auto")
 
     return model, history
 

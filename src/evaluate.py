@@ -8,23 +8,28 @@ from tqdm import tqdm
 from diceloss import DiceLoss
 from main import StandartConfig
 from utils import get_model
+import seaborn as sns
+import matplotlib.pyplot as plt
+import segmentation_models_pytorch as smp
 
 
-def evaluate(model_list=["pspnet"], cfg=None):
+def evaluate(model_list=["pspnet_Epochs:5"], cfg=None):
     if cfg is None:
         cfg = StandartConfig
 
     test_dataset = DeepGlobeDataset(
-        data_dir=cfg.data_train,
-        split="val",
-        val_size=cfg.val_size,
+        data_dir=cfg.data_dir,
+        split="test",
+        test_size=cfg.test_size,
     )
 
     test_loader = torch.utils.data.DataLoader(
         test_dataset, batch_size=cfg.batch_size, shuffle=False
     )
 
-    criterion = DiceLoss()  # torch.nn.CrossEntropyLoss()
+    criterion = smp.losses.DiceLoss(
+        smp.losses.MULTICLASS_MODE, from_logits=True
+    )  # torch.nn.CrossEntropyLoss()
     conf_matrix = MulticlassConfusionMatrix(num_classes=cfg.classes).to(cfg.device)
 
     results = []
@@ -38,7 +43,7 @@ def evaluate(model_list=["pspnet"], cfg=None):
             continue
         model_path = os.path.join(cfg.checkpoints_dir, model_file)
 
-        model = get_model(model_name, cfg)
+        model = get_model(model_name.split("_")[0], cfg)
         model.load_state_dict(
             torch.load(model_path, map_location=torch.device(cfg.device))
         )
@@ -71,12 +76,63 @@ def evaluate(model_list=["pspnet"], cfg=None):
         print(f"  Loss: {avg_loss:.4f}")
         print(f"  Mean IoU: {mean_iou:.4f}")
         print(f"  Confusion Matrix:\n{cm.cpu().numpy()}")
-
+        plot_confusion_matrix(
+            cm,
+            save_path=f"../results/{model_name}_confmatrix.png",
+            normalization="row",
+        )
         conf_matrix.reset()
 
     results_df = pd.DataFrame(results)
     print("\n--- Comparison ---")
     print(results_df)
+
+
+def plot_confusion_matrix(
+    cm: torch.Tensor,
+    class_names: list = [
+        "Urban land",
+        "Agriculture land",
+        "Rangeland",
+        "Forest land",
+        "Water",
+        "Barren land",
+        "Unknown",
+    ],
+    save_path: str = "confusion_matrix.png",
+    normalization: str = "total",
+) -> None:
+    """
+    Plots and saves the confusion matrix.
+
+    Args:
+        cm (torch.Tensor): Confusion matrix tensor.
+        class_names (list): List of class names.
+        save_path (str): The path to save the plot image.
+    """
+    if normalization == "total":
+        cm = cm / cm.sum()
+    elif normalization == "row":
+        cm = cm / cm.sum(dim=1, keepdim=True)
+    elif normalization == "column":
+        cm = cm / cm.sum(dim=0, keepdim=True)
+    fig, ax = plt.subplots(figsize=(10, 8))
+    sns.heatmap(
+        cm.cpu().numpy(),
+        annot=True,
+        fmt=".4f",
+        cmap="Blues",
+        xticklabels=class_names,
+        yticklabels=class_names,
+        ax=ax,
+    )
+    ax.set_xlabel("Predicted Labels")
+    ax.set_ylabel("True Labels")
+    ax.set_title("Confusion Matrix")
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path)
+    plt.close(fig)
 
 
 if __name__ == "__main__":
