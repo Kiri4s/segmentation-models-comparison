@@ -16,3 +16,4 @@ src/outputs
 src/checkpoints/
 src/script.py
 notebooks/evaluate.ipynb
+results/collected/comparison*
