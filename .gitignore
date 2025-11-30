@@ -15,3 +15,4 @@ src/lightning_logs
 src/outputs
 src/checkpoints/
 src/script.py
+notebooks/evaluate.ipynb
