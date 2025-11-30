@@ -13,5 +13,5 @@ tasks
 
 src/lightning_logs
 src/outputs
-src/checkpoints/*.pth
+src/checkpoints/
 src/script.py
