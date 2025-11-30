@@ -101,9 +101,6 @@ class DeepGlobeDataset(Dataset):
             image = self.transform(image)
 
         mask_array = np.array(mask)
-
-        # Assuming the mask is an RGB image, we convert RGB values to class labels.
-        # This mapping might need adjustment based on the actual dataset's color-to-class encoding.
         class_mask = np.zeros(mask_array.shape[:2], dtype=np.uint8)
 
         for rgb, label in self.class_mapping.items():

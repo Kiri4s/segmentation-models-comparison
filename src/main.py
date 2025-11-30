@@ -17,7 +17,7 @@ class StandartConfig(TypedDict):
     target_transform = None
     batch_size: int = 1
     learning_rate: float = 2e-4
-    epochs: int = 1
+    epochs: int = 5
     encoder_name: str = "resnet18"
     encoder_weights: str = "imagenet"
     activation: str = "logsoftmax"
@@ -28,11 +28,15 @@ class StandartConfig(TypedDict):
     freeze_encoder_layers: int = -2  # freeze encoder excluding 2 last layers
 
 
-def main(model_name: str = "unet", cfg=None):
+def main(model_name: str = "unet", cfg=None, load_from_checkpoint=None):
     if cfg is None:
         cfg = StandartConfig
 
     model = get_model(model_name, cfg)
+    if load_from_checkpoint is not None:
+        model.load_state_dict(
+            torch.load(load_from_checkpoint, map_location=torch.device(cfg.device))
+        )
     model.to(cfg.device)
     if cfg.freeze_encoder_layers:
         print("freezing encoder layers")
@@ -97,7 +101,7 @@ def main(model_name: str = "unet", cfg=None):
         model_name=model_name,
         checkpoint_dir=cfg.checkpoints_dir,
     )
-    
+
     after_training_plots(history, save_path="auto")
 
     return model, history

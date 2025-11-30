@@ -8,8 +8,10 @@ import segmentation_models_pytorch as smp
 from torchvision import transforms as T
 
 
-def get_model(model_name: str, cfg):
+def get_model(model_name: str, cfg) -> torch.nn.Module:
     if model_name == "unet":
+        cfg.transform = None
+        cfg.target_transform = None
         model = smp.Unet(
             encoder_name=cfg.encoder_name,
             encoder_weights=cfg.encoder_weights,
@@ -18,6 +20,8 @@ def get_model(model_name: str, cfg):
             activation=cfg.activation,
         )
     elif model_name == "pspnet":
+        cfg.transform = None
+        cfg.target_transform = None
         model = smp.PSPNet(
             encoder_name=cfg.encoder_name,
             encoder_weights=cfg.encoder_weights,
@@ -27,6 +31,8 @@ def get_model(model_name: str, cfg):
         )
 
     elif model_name == "deeplab":
+        cfg.transform = None
+        cfg.target_transform = None
         model = smp.DeepLabV3(
             encoder_name=cfg.encoder_name,
             encoder_weights=cfg.encoder_weights,

@@ -13,19 +13,17 @@ import matplotlib.pyplot as plt
 import segmentation_models_pytorch as smp
 
 
-def evaluate(model_list=["pspnet_Epochs:5"], cfg=None):
+MODELS_LIST = [
+    "unet_Epochs_4_lf_DiceLoss_lr_0.0002",
+    # "pspnet_Epochs:5",
+    "fpn_Epochs:5_lf:DiceLoss_lr:0.0002",
+    "pspnet_Epochs:5_lf:DiceLoss_lr:0.0002",
+]
+
+
+def evaluate(model_list=MODELS_LIST, cfg=None):
     if cfg is None:
         cfg = StandartConfig
-
-    test_dataset = DeepGlobeDataset(
-        data_dir=cfg.data_dir,
-        split="test",
-        test_size=cfg.test_size,
-    )
-
-    test_loader = torch.utils.data.DataLoader(
-        test_dataset, batch_size=cfg.batch_size, shuffle=False
-    )
 
     criterion = smp.losses.DiceLoss(
         smp.losses.MULTICLASS_MODE, from_logits=True
@@ -44,6 +42,18 @@ def evaluate(model_list=["pspnet_Epochs:5"], cfg=None):
         model_path = os.path.join(cfg.checkpoints_dir, model_file)
 
         model = get_model(model_name.split("_")[0], cfg)
+
+        test_dataset = DeepGlobeDataset(
+            data_dir=cfg.data_dir,
+            split="test",
+            test_size=cfg.test_size,
+            transform=cfg.transform,
+            target_transform=cfg.target_transform,
+        )
+
+        test_loader = torch.utils.data.DataLoader(
+            test_dataset, batch_size=cfg.batch_size, shuffle=False
+        )
         model.load_state_dict(
             torch.load(model_path, map_location=torch.device(cfg.device))
         )
@@ -80,6 +90,7 @@ def evaluate(model_list=["pspnet_Epochs:5"], cfg=None):
             cm,
             save_path=f"../results/{model_name}_confmatrix.png",
             normalization="row",
+            model_name=model_name.split("_")[0],
         )
         conf_matrix.reset()
 
@@ -101,6 +112,7 @@ def plot_confusion_matrix(
     ],
     save_path: str = "confusion_matrix.png",
     normalization: str = "total",
+    model_name: str = "",
 ) -> None:
     """
     Plots and saves the confusion matrix.
@@ -128,7 +140,7 @@ def plot_confusion_matrix(
     )
     ax.set_xlabel("Predicted Labels")
     ax.set_ylabel("True Labels")
-    ax.set_title("Confusion Matrix")
+    ax.set_title(f"{model_name} confusion matrix")
     plt.tight_layout()
     if save_path:
         plt.savefig(save_path)
