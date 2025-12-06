@@ -13,7 +13,5 @@ tasks
 
 src/lightning_logs
 src/outputs
-src/checkpoints/
+src/checkpoints/*.pth
 src/script.py
-notebooks/evaluate.ipynb
-notebooks/evaluate.ipynb

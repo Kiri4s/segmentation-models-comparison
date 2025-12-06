@@ -2,7 +2,7 @@
 
 ## Обзор
 
-Этот проект посвящен сравнению различных моделей семантической сегментации (PSPNet, U-Net, FPN) на датасете DeepGlobe Land Cover Classification. Цель проекта — исследовать эффективность этих архитектур для задачи классификации типов земельного покрова по спутниковым снимкам. Репозиторий содержит код для подготовки данных, обучения моделей, их оценки и визуализации результатов.
+Этот репозиторий посвящен сравнению различных моделей семантической сегментации (PSPNet, U-Net, FPN) на датасете DeepGlobe Land Cover Classification. Цель проекта — исследовать эффективность этих архитектур для задачи классификации типов земельного покрова по спутниковым снимкам. Репозиторий содержит код для подготовки данных, обучения моделей, их оценки и визуализации результатов.
 
 ## Структура проекта
 
@@ -46,7 +46,7 @@
     * [Обучение](#обучение)
     * [Оценка результатов](#оценка-результатов)
 * [Результаты](#результаты)
-* [Выводы](#вывод)
+* [Обсуждение Результатов](#обсуждение-результатов)
 
 ## Датасет
 
@@ -59,28 +59,28 @@
 | класс                       | цвет      | метка |
 |:----------------------------|:---------:|:-----:|
 | Город/Поселение             | бирюзовый | 0     |
-| Сельскохозяйственные угодья | жёлтый    | 1     |
+| Пашня                       | жёлтый    | 1     |
 | Пастбище                    | пурпурный | 2     |
 | Лес                         | зелёный   | 3     |
 | Вода                        | синий     | 4     |
-| Пустыня                     | белый     | 5     |
+| Бесплодная земля            | белый     | 5     |
 | Неизвестно                  | чёрный    | 6     |
 
 ### Примеры:
 
 <div style="display:flex; align-items:center;">
-    <img src="./dataset/train/6399_sat.jpg" alt="satelite" style="width:33%; max-width:400px;">
-    <img src="./dataset/train/6399_mask.png" alt="mask" style="width:33%; max-width:400px;">
+    <img src=".//results/dataset_samples/6399_sat.jpg" alt="satelite" style="width:33%; max-width:400px;">
+    <img src="./results/dataset_samples/6399_mask.png" alt="mask" style="width:33%; max-width:400px;">
 </div>
 
 <div style="display:flex; align-items:center;">
-    <img src="./dataset/train/10901_sat.jpg" alt="satelite" style="width:33%; max-width:400px;">
-    <img src="./dataset/train/10901_mask.png" alt="mask" style="width:33%; max-width:400px;">
+    <img src="./results/dataset_samples/10901_sat.jpg" alt="satelite" style="width:33%; max-width:400px;">
+    <img src="./results/dataset_samples/10901_mask.png" alt="mask" style="width:33%; max-width:400px;">
 </div>
 
 <div style="display:flex; align-items:center;">
-    <img src="./dataset/train/855_sat.jpg" alt="satelite" style="width:33%; max-width:400px;">
-    <img src="./dataset/train/855_mask.png" alt="mask" style="width:33%; max-width:400px;">
+    <img src="./results/dataset_samples/855_sat.jpg" alt="satelite" style="width:33%; max-width:400px;">
+    <img src="./results/dataset_samples/855_mask.png" alt="mask" style="width:33%; max-width:400px;">
 </div>
 
 Данные для обучения, валидации и тестирования находятся в директории `dataset/train`.
@@ -93,7 +93,40 @@
 * U-Net
 * FPN (Feature Pyramid Network)
 
-Исходный код моделей и скрипты для обучения и оценки находятся в директории `src/`.
+Для загрузки моделей использовалась библиотека segmentation_models_pytorch.
+Исходный код для обучения и оценки находятся в директории `src/`.
+
+### Веса моделей доступны по ссылкам:
+
+* [PSPNet](https://drive.google.com/file/d/1zJhmho7_O2emZrxoupOwFxq2s5REtOqV/view?usp=sharing)
+* [U-Net](https://drive.google.com/file/d/1sOP2s_wqlDXmDhAUKfP2y9ODNnyDDrwp/view?usp=sharing)
+* [FPN](https://drive.google.com/file/d/1WA_6BwBIqgultfo7x_5gSQFWrxcMTN3A/view?usp=sharing)
+
+### Все модели обучались с конфигом:
+
+```python
+class StandartConfig(TypedDict):
+    data_dir: str = "../dataset/train"
+    val_size: float = 0.2
+    test_size: float = 0.1
+    transform = None
+    target_transform = None
+    batch_size: int = 1
+    learning_rate: float = 2e-4
+    epochs: int = 5
+    encoder_name: str = "resnet18"
+    encoder_weights: str = "imagenet"
+    activation: str = "logsoftmax"
+    in_channels: int = 3
+    classes: int = 7
+    device: str = "mps"
+    checkpoints_dir: str = "./checkpoints"
+    freeze_encoder_layers: int = -2  # freeze encoder excluding 2 last layers
+```
+
+- **Loss**: DiceLoss
+- **Optimizer**: Adam
+- **Core Metric**: mean IoU
 
 ## Использование
 
@@ -160,6 +193,7 @@ cd src && uv run evaluate.py
 ## Результаты
 
 Результаты экспериментов, включая графики обучения и матрицы ошибок, сохраняются в директории `results/`.
+История обучения (train & val loss, val IoU) хранится в директории `src/checkpoints/`.
 
 ### Визуальное сравнение
 
@@ -207,6 +241,12 @@ cd src && uv run evaluate.py
 | 1 |   unet |  0.280340 |  0.474416 |
 | 2 |    fpn |  0.441761 |  0.478314 |
 
-## Вывод
+## Обсуждение Результатов
 
-Архитектуры **FPN** и **U-Net** показали себя наиболее эффективными для задачи семантической сегментации на датасете DeepGlobe Land Cover. Обе модели достигли схожих и высоких относительно **PSPnet** показателей по метрике `mean_iou`, при этом FPN (`0.478`) незначительно превзошла U-Net (`0.474`).
+Оценивая работу моделей визуально, нетрудно заметить что модели unet и fpn демонстрируют результаты похожие по качеству, а pspnet сильно отстаёт от них. Это может быть вызвано недостатком параметров модели (для всех моделей использовалась одна и та же resnet18 backbone сеть, с замороженными слоями для энкодера за исключением двух последних). В поддержку pspnet можно сказать что эта модель имеет меньшее время схождения и более высокую скорость работы (в ~2 раза быстрее unet & fpn). 
+
+По графикам лосса видно, что: pspnet сходится быстрее; unet и fpn ещё имеют потенциал для обучения. Средний IoU у unet и fpn выше чем у pspnet, что подтверждается на предсказаниях.
+
+Матрицы ошибок показали, что для pspnet свойственно предсказывать пастбище как пастбище и пашню равновероятно. Такая же склонность есть и у других моделей, но менее выраженная. Вместо бесплодной земли pspnet предсказывает пашню. Матрицы ошибок у unet и fpn близки к диагональным. Все модели вообще не предсказывают неизвестный класс, предпочитая отнести его (за малочисленностью) к какому-нибудь другому.
+
+Результаты сравнения моделей по среднему IoU на тестовой выборке показали что unet и fpn близки по ппроизводительности, но fpn на ~0.004 пункта лучше. Поскольку лосс fpn выше чем у unet я бы предпочёл первую модель как более способную к дальнейшему обучению.
